@@ -64,16 +64,678 @@
     <markdown-editor v-model="markdownContent" @file-uploaded="handleFileUpload" />
 
     <!-- Pass the hospitals data down to HospitalListDisplay component -->
-    <HospitalListDisplay :h="dataFromApi" :hospitals="filteredHospitals" :allStates="allStates"
-      :allProviders="allProviders" @edit-hospital="handleEditHospital"
-      @update-hospital="updateHospital" />
-    
+    <HospitalListDisplay :hospitals="hospitals" :allStates="allStates" :allProviders="allProviders" @edit-hospital="handleEditHospital" @update-hospital="updateHospital" />
+
     <!-- HospitalExport component -->
     <HospitalExport />
   </div>
 </template>
 
 <script lang="ts">
+import { defineComponent } from 'vue';
+import HospitalListDisplay from '@/components/HospitalListDisplay.vue';
+import HospitalExport from '@/components/HospitalExport.vue';
+import HospitalForm from '@/components/HospitalForm.vue';
+import hospitals from '@/utils/hospitals';
+import { type Hospital } from '@/utils/hospitals';
+import { checkAuthentication } from '@/utils/authUtils';
+
+export default defineComponent({
+  components: {
+    HospitalExport,
+    HospitalListDisplay,
+    HospitalForm,
+  },
+  data() {
+    return {
+      searchQuery: '',
+      stateSearchQuery: '',
+      providerSearchQuery: '',
+      hospitals: [] as Hospital[],
+      timer: 0,
+      markdownContent: '',
+      showStateDropdown: false,
+      showProviderDropdown: false,
+      allStates: [
+        'All state', 'Abia', 'Abuja', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
+        'Ekiti', 'Enugu', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+        'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+      ], // Populate with all states
+      allProviders: [
+        'Clinic', 'Dental Clinic', 'Dermatological Center', 'Ent', 'Gym', 'Hospital', 'Optical Center', 'Orthopedic Center', 'Physiotherapy Clinic',
+        'Psychiatry Center', 'Psychotherapy Center', 'Spa', 'Tertiary Care Center',
+      ], // Populate with all providers
+      editMode: false,
+      editedHospital: {} as Hospital,
+    };
+  },
+  computed: {
+    filteredHospitals(): Hospital[] {
+      let filteredHospitals = this.hospitals;
+
+      if (this.stateSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.state.toLowerCase().includes(this.stateSearchQuery.toLowerCase())
+        );
+      }
+
+      if (this.providerSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
+        );
+      }
+
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase().trim();
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.name.toLowerCase().includes(query) ||
+          hospital.address.toLowerCase().includes(query) ||
+          hospital.phoneNumber.includes(query) ||
+          (hospital.email && hospital.email.toLowerCase().includes(query))
+        );
+      }
+
+      return filteredHospitals;
+    }
+  },
+  methods: {
+    async search() {
+      clearTimeout(this.timer);
+      this.timer = setTimeout(async () => {
+        try {
+          let filteredHospitals = hospitals;
+
+          // Filter by search query
+          if (this.searchQuery.trim() !== '') {
+            const query = this.searchQuery.toLowerCase().trim();
+            filteredHospitals = filteredHospitals.filter(hospital =>
+              hospital.name.toLowerCase().includes(query)
+            );
+          }
+
+          // Filter by selected state
+          if (this.stateSearchQuery.trim() !== '' && this.stateSearchQuery !== 'All state') {
+            const selectedState = this.stateSearchQuery;
+            filteredHospitals = filteredHospitals.filter(hospital =>
+              hospital.state.toLowerCase() === selectedState.toLowerCase()
+            );
+          }
+
+          // Filter by selected provider
+          if (this.providerSearchQuery.trim() !== '') {
+            const selectedProvider = this.providerSearchQuery;
+            filteredHospitals = filteredHospitals.filter(hospital =>
+              hospital.provider.toLowerCase() === selectedProvider.toLowerCase()
+            );
+          }
+
+          // Update hospitals data after filtering
+          this.hospitals = filteredHospitals;
+        } catch (error) {
+          console.error('Error fetching hospitals:', error);
+        }
+      }, 300);
+    },
+    async fetchHospitals() {
+      // Simulated API call
+      return [];
+    },
+    handleEditHospital(hospital: Hospital) {
+      this.editMode = true;
+      this.editedHospital = { ...hospital };
+    },
+    updateHospital() {
+      console.log('Updating hospital:', this.editedHospital);
+      const index = this.hospitals.findIndex(hospital => hospital.id === this.editedHospital.id);
+      if (index !== -1) {
+        this.hospitals[index] = { ...this.editedHospital };
+      } else {
+        console.error('Hospital not found in the hospitals array.');
+      }
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
+    cancelEdit() {
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
+    handleLoginPrompt() {
+      alert('Please login or sign up to edit hospitals.'); // You can customize this to show a modal or redirect to the login/signup page
+    },
+    handleEditClick() {
+      if (this.checkAuthentication()) {
+        console.log('User is authenticated. Handling edit click...');
+      } else {
+        this.handleLoginPrompt();
+      }
+    },
+    toggleStateDropdown() {
+      this.showStateDropdown = !this.showStateDropdown;
+    },
+    toggleProviderDropdown() {
+      this.showProviderDropdown = !this.showProviderDropdown;
+    },
+    selectState(state: string) {
+      this.stateSearchQuery = state;
+      // Close the dropdown immediately after selecting a state
+      this.showStateDropdown = false;
+    },
+    selectProvider(provider: string) {
+      this.providerSearchQuery = provider;
+      this.showProviderDropdown = false;
+    },
+    checkAuthentication() {
+      return checkAuthentication(); // Call the checkAuthentication function to verify the user's authentication status
+    },
+    handleFileUpload(file: File) {
+      // Handle file upload logic here
+      console.log('File uploaded:', file);
+    }
+  },
+});
+</script>
+
+<style scoped></style>
+
+
+
+
+
+
+
+
+<!-- <template>
+  <div class="p-4">
+    <h3 class="text-gray-600 ml- mt-20 py-8">Find hospitals close to you</h3>
+    <div class="flex justify-center mb-10 gap-5"> -->
+
+      <!-- All states dropdown -->
+      <!-- <div class="relative">
+        <input type="text" v-model="stateSearchQuery" placeholder="States..."
+          class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="toggleStateDropdown">
+
+        <span class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer" @click="toggleStateDropdown">
+          <svg class="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+              d="M10 12a1 1 0 0 1-.707-.293l-4-4a1 1 0 1 1 1.414-1.414L10 9.586l3.293-3.293a1 1 0 0 1 1.414 1.414l-4 4a1 1 0 0 1-.707.293z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+
+        <div v-show="showStateDropdown" class="absolute z-10 bg-white border border-gray-300 rounded-md shadow-md w-md">
+          <ul class="py-2">
+            <li v-for="state in allStates" @click="selectState(state)" :key="state"
+              class="cursor-pointer hover:bg-gray-100 px-3 py-1">
+              {{ state }}
+            </li>
+          </ul>
+        </div>
+      </div> -->
+
+      <!-- All providers dropdown -->
+      <!-- <div class="relative">
+        <input type="text" v-model="providerSearchQuery" placeholder="Providers..."
+          class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="toggleProviderDropdown">
+        <span class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer" @click="toggleProviderDropdown">
+          <svg class="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+              d="M10 12a1 1 0 0 1-.707-.293l-4-4a1 1 0 1 1 1.414-1.414L10 9.586l3.293-3.293a1 1 0 0 1 1.414 1.414l-4 4a1 1 0 0 1-.707.293z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <div v-show="showProviderDropdown"
+          class="absolute z-10 bg-white border border-gray-300 rounded-md shadow-md w-md">
+          <ul class="py-2">
+            <li v-for="provider in allProviders" @click="selectProvider(provider)" :key="provider"
+              class="cursor-pointer hover:bg-gray-100 px-3 py-1">
+              {{ provider }}
+            </li>
+          </ul>
+        </div>
+      </div> -->
+
+      <!-- Search Hospitals input -->
+      <!-- <input type="text" v-model="searchQuery" placeholder="Search Hospitals..."
+        class="p-2 border border-gray-300 rounded-md mb-4 w-md"> -->
+
+      <!-- Search button -->
+      <!-- <button @click="search" class="bg-blue-500 text-white p-4 rounded-md 
+      hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
+    </div> -->
+
+    <!-- Edit form -->
+    <!-- <div v-if="editMode">
+      <h2 class="py-10">Edit Hospital</h2>
+      <form @submit.prevent="updateHospital" class="flex justify-center p-10">
+        <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
+        <input type="text" v-model="editedHospital.address" placeholder="Hospital Address">
+        <input type="text" v-model="editedHospital.phoneNumber" placeholder="Hospital Phone Number">
+        <input type="text" v-model="editedHospital.email" placeholder="Hospital Email">
+        <button @click="handleEditClick" class="px-3 bg-blue-400 text-white hover:bg-blue-600 rounded-md"
+          v-if="checkAuthentication()">Update</button>
+        <button @click="handleLoginPrompt" class="px-3 bg-blue-400 text-white hover:bg-blue-600 rounded-md" v-else>Login
+          to Edit</button>
+        <button @click="cancelEdit" class="px-3 bg-red-400 text-white hover:bg-red-600 rounded-md">Cancel</button>
+      </form>
+    </div> -->
+
+    <!-- HospitalForm -->
+    <!-- <HospitalForm /> -->
+
+    <!-- Markdown Component -->
+    <!-- <markdown-editor v-model="markdownContent" @file-uploaded="handleFileUpload" /> -->
+
+    <!-- Pass the hospitals data down to HospitalListDisplay component -->
+    <!-- <HospitalListDisplay :h="dataFromApi" :hospitals="filteredHospitals" :allStates="allStates"
+      :allProviders="allProviders" @edit-hospital="handleEditHospital" @update-hospital="updateHospital" /> -->
+
+    <!-- HospitalExport component -->
+    <!-- <HospitalExport />
+  </div>
+</template> -->
+
+<!-- <script lang="ts">
+import { defineComponent } from 'vue';
+import HospitalListDisplay from '@/components/HospitalListDisplay.vue';
+import HospitalExport from '@/components/HospitalExport.vue';
+import HospitalForm from '@/components/HospitalForm.vue';
+import hospitals from '@/utils/hospitals';
+import { type Hospital } from '@/utils/hospitals';
+import { checkAuthentication } from '@/utils/authUtils';
+
+export default defineComponent({
+  components: {
+    HospitalExport,
+    HospitalListDisplay,
+    HospitalForm,
+  },
+  data() {
+    return {
+      searchQuery: '',
+      stateSearchQuery: '',
+      providerSearchQuery: '',
+      hospitals: [...hospitals] as Hospital[],
+      timer: 0,
+      markdownContent: '',
+      showStateDropdown: false,
+      showProviderDropdown: false,
+      allStates: [
+        'All state', 'Abia', 'Abuja', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
+        'Ekiti', 'Enugu', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+        'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+      ], // Populate with all states
+      allProviders: [
+        'Clinic', 'Dental Clinic', 'Dermatological Center', 'Ent', 'Gym', 'Hospital', 'Optical Center', 'Orthopedic Center', 'Physiotherapy Clinic',
+        'Psychiatry Center', 'Psychotherapy Center', 'Spa', 'Tertiary Care Center',
+      ], // Populate with all providers
+      editMode: false,
+      editedHospital: {} as Hospital,
+    };
+  },
+  computed: {
+    filteredHospitals(): Hospital[] {
+      let filteredHospitals = this.dataFromApi; // Use the fetched hospital data
+
+      if (this.stateSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.state.toLowerCase().includes(this.stateSearchQuery.toLowerCase())
+        );
+      }
+
+      if (this.providerSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
+        );
+      }
+
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase().trim();
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.name.toLowerCase().includes(query) ||
+          hospital.address.toLowerCase().includes(query) ||
+          hospital.phoneNumber.includes(query) ||
+          (hospital.email && hospital.email.toLowerCase().includes(query))
+        );
+      }
+
+      return filteredHospitals;
+    }
+  },
+  methods: {
+    async search() {
+      clearTimeout(this.timer);
+      this.timer = setTimeout(async () => {
+        try {
+          // Simulated asynchronous data fetching
+          // this.hospitals = hospitals;
+          this.hospitals = [];
+
+          this.hospitals = await this.fetchHospitals();
+        } catch (error) {
+          console.error('Error fetching hospitals:', error);
+        }
+      }, 300);
+    },
+    async fetchHospitals() {
+     
+      return [];
+    },
+    handleEditHospital(hospital: Hospital) {
+      this.editMode = true;
+      this.editedHospital = { ...hospital };
+    },
+    updateHospital() {
+      console.log('Updating hospital:', this.editedHospital);
+      const index = this.hospitals.findIndex(hospital => hospital.id === this.editedHospital.id);
+      if (index !== -1) {
+        this.hospitals[index] = { ...this.editedHospital };
+      } else {
+        console.error('Hospital not found in the hospitals array.');
+      }
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
+    cancelEdit() {
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
+    handleLoginPrompt() {
+      alert('Please login or sign up to edit hospitals.'); // You can customize this to show a modal or redirect to the login/signup page
+    },
+    handleEditClick() {
+      if (this.checkAuthentication()) {
+        console.log('User is authenticated. Handling edit click...');
+      } else {
+        this.handleLoginPrompt();
+      }
+    },
+    toggleStateDropdown() {
+      this.showStateDropdown = !this.showStateDropdown;
+    },
+    toggleProviderDropdown() {
+      this.showProviderDropdown = !this.showProviderDropdown;
+    },
+    selectState(state: string) {
+      this.stateSearchQuery = state;
+      // Close the dropdown immediately after selecting a state
+      this.showStateDropdown = false;
+    },
+    selectProvider(provider: string) {
+      this.providerSearchQuery = provider;
+      this.showProviderDropdown = false;
+    },
+    checkAuthentication() {
+      return checkAuthentication(); // Call the checkAuthentication function to verify the user's authentication status
+    }
+  },
+  props: {
+    allStates: {
+      type: Array as () => string[],
+      required: true,
+    },
+    allProviders: {
+      type: Array as () => string[],
+      required: true,
+    },
+  },
+});
+</script>
+
+<style scoped></style> -->
+
+
+
+
+
+
+<!-- <template>
+  <div class="p-4">
+    <h3 class="text-gray-600 ml- mt-20 py-8">Find hospitals close to you</h3>
+    <div class="flex justify-center mb-10 gap-5"> -->
+
+      <!-- All states dropdown -->
+      <!-- <div class="relative">
+        <input type="text" v-model="stateSearchQuery" placeholder="States..."
+          class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="toggleStateDropdown">
+
+        <span class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer" @click="toggleStateDropdown">
+          <svg class="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+              d="M10 12a1 1 0 0 1-.707-.293l-4-4a1 1 0 1 1 1.414-1.414L10 9.586l3.293-3.293a1 1 0 0 1 1.414 1.414l-4 4a1 1 0 0 1-.707.293z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+
+        <div v-show="showStateDropdown" class="absolute z-10 bg-white border border-gray-300 rounded-md shadow-md w-md">
+          <ul class="py-2">
+            <li v-for="state in allStates" @click="selectState(state)" :key="state"
+              class="cursor-pointer hover:bg-gray-100 px-3 py-1">
+              {{ state }}
+            </li>
+          </ul>
+        </div>
+      </div> -->
+
+      <!-- All providers dropdown -->
+      <!-- <div class="relative">
+        <input type="text" v-model="providerSearchQuery" placeholder="Providers..."
+          class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="toggleProviderDropdown">
+        <span class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer" @click="toggleProviderDropdown">
+          <svg class="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+              d="M10 12a1 1 0 0 1-.707-.293l-4-4a1 1 0 1 1 1.414-1.414L10 9.586l3.293-3.293a1 1 0 0 1 1.414 1.414l-4 4a1 1 0 0 1-.707.293z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <div v-show="showProviderDropdown"
+          class="absolute z-10 bg-white border border-gray-300 rounded-md shadow-md w-md">
+          <ul class="py-2">
+            <li v-for="provider in allProviders" @click="selectProvider(provider)" :key="provider"
+              class="cursor-pointer hover:bg-gray-100 px-3 py-1">
+              {{ provider }}
+            </li>
+          </ul>
+        </div>
+      </div> -->
+
+      <!-- Search Hospitals input -->
+      <!-- <input type="text" v-model="searchQuery" placeholder="Search Hospitals..."
+        class="p-2 border border-gray-300 rounded-md mb-4 w-md"> -->
+
+      <!-- Search button -->
+      <!-- <button @click="search" class="bg-blue-500 text-white p-4 rounded-md 
+      hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
+    </div> -->
+
+    <!-- Edit form -->
+    <!-- <div v-if="editMode">
+      <h2 class="py-10">Edit Hospital</h2>
+      <form @submit.prevent="updateHospital" class="flex justify-center p-10">
+        <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
+        <input type="text" v-model="editedHospital.address" placeholder="Hospital Address">
+        <input type="text" v-model="editedHospital.phoneNumber" placeholder="Hospital Phone Number">
+        <input type="text" v-model="editedHospital.email" placeholder="Hospital Email">
+        <button @click="handleEditClick" class="px-3 bg-blue-400 text-white hover:bg-blue-600 rounded-md"
+          v-if="checkAuthentication()">Update</button>
+        <button @click="handleLoginPrompt" class="px-3 bg-blue-400 text-white hover:bg-blue-600 rounded-md" v-else>Login
+          to Edit</button>
+        <button @click="cancelEdit" class="px-3 bg-red-400 text-white hover:bg-red-600 rounded-md">Cancel</button>
+      </form>
+    </div> -->
+
+    <!-- HospitalForm -->
+    <!-- <HospitalForm /> -->
+
+    <!-- Markdown Component -->
+    <!-- <markdown-editor v-model="markdownContent" @file-uploaded="handleFileUpload" /> -->
+
+    <!-- Pass the hospitals data down to HospitalListDisplay component -->
+    <!-- <HospitalListDisplay :h="dataFromApi" :hospitals="filteredHospitals" :allStates="allStates"
+      :allProviders="allProviders" @edit-hospital="handleEditHospital" @update-hospital="updateHospital" /> -->
+
+    <!-- HospitalExport component -->
+    <!-- <HospitalExport />
+  </div>
+</template> -->
+
+<!-- <script lang="ts">
+import { defineComponent } from 'vue';
+import HospitalListDisplay from '@/components/HospitalListDisplay.vue';
+import HospitalExport from '@/components/HospitalExport.vue';
+import HospitalForm from '@/components/HospitalForm.vue';
+import hospitals from '@/utils/hospitals';
+import { type Hospital } from '@/utils/hospitals';
+import { checkAuthentication } from '@/utils/authUtils';
+
+export default defineComponent({
+  components: {
+    HospitalExport,
+    HospitalListDisplay,
+    HospitalForm,
+  },
+  data() {
+    return {
+      searchQuery: '',
+      stateSearchQuery: '',
+      providerSearchQuery: '',
+      hospitals: [...hospitals] as Hospital[],
+      timer: 0,
+      markdownContent: '',
+      showStateDropdown: false,
+      showProviderDropdown: false,
+      allStates: [
+        'All state', 'Abia', 'Abuja', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
+        'Ekiti', 'Enugu', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+        'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+      ], // Populate with all states
+      allProviders: [
+        'Clinic', 'Dental Clinic', 'Dermatological Center', 'Ent', 'Gym', 'Hospital', 'Optical Center', 'Orthopedic Center', 'Physiotherapy Clinic',
+        'Psychiatry Center', 'Psychotherapy Center', 'Spa', 'Tertiary Care Center',
+      ], // Populate with all providers
+      editMode: false,
+      editedHospital: {} as Hospital,
+    };
+  },
+  computed: {
+    filteredHospitals(): Hospital[] {
+      let filteredHospitals = this.dataFromApi; // Use the fetched hospital data
+
+      if (this.stateSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.state.toLowerCase().includes(this.stateSearchQuery.toLowerCase())
+        );
+      }
+
+      if (this.providerSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
+        );
+      }
+
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase().trim();
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.name.toLowerCase().includes(query) ||
+          hospital.address.toLowerCase().includes(query) ||
+          hospital.phoneNumber.includes(query) ||
+          (hospital.email && hospital.email.toLowerCase().includes(query))
+        );
+      }
+
+      return filteredHospitals;
+    }
+  },
+  methods: {
+    async search() {
+      clearTimeout(this.timer);
+      this.timer = setTimeout(async () => {
+        try {
+          // Simulated asynchronous data fetching
+          // this.hospitals = hospitals;
+          this.hospitals = [];
+
+          this.hospitals = await this.fetchHospitals();
+        } catch (error) {
+          console.error('Error fetching hospitals:', error);
+        }
+      }, 300);
+    },
+    async fetchHospitals() {
+      // Simulate fetching hospitals based on searchQuery, stateSearchQuery, providerSearchQuery
+      // API call to fetch hospitals
+      // I'm returning a sample array of hospitals
+      return [];
+    },
+    handleEditHospital(hospital: Hospital) {
+      this.editMode = true;
+      this.editedHospital = { ...hospital };
+    },
+    updateHospital() {
+      console.log('Updating hospital:', this.editedHospital);
+      const index = this.hospitals.findIndex(hospital => hospital.id === this.editedHospital.id);
+      if (index !== -1) {
+        this.hospitals[index] = { ...this.editedHospital };
+      } else {
+        console.error('Hospital not found in the hospitals array.');
+      }
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
+    cancelEdit() {
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
+    handleLoginPrompt() {
+      alert('Please login or sign up to edit hospitals.'); // You can customize this to show a modal or redirect to the login/signup page
+    },
+    handleEditClick() {
+      if (this.checkAuthentication()) {
+        console.log('User is authenticated. Handling edit click...');
+      } else {
+        this.handleLoginPrompt();
+      }
+    },
+    toggleStateDropdown() {
+      this.showStateDropdown = !this.showStateDropdown;
+    },
+    toggleProviderDropdown() {
+      this.showProviderDropdown = !this.showProviderDropdown;
+    },
+    selectState(state: string) {
+      this.stateSearchQuery = state;
+      this.showStateDropdown = false;
+    },
+    selectProvider(provider: string) {
+      this.providerSearchQuery = provider;
+      this.showProviderDropdown = false;
+    },
+    checkAuthentication() {
+      return checkAuthentication(); // Call the checkAuthentication function to verify the user's authentication status
+    }
+  },
+  props: {
+    allStates: {
+      type: Array as () => string[],
+      required: true,
+    },
+    allProviders: {
+      type: Array as () => string[],
+      required: true,
+    },
+  },
+});
+</script>
+
+<style scoped></style> -->
+
+
+
+
+
+
+
+
+<!-- <script lang="ts">
 import { defineComponent } from 'vue';
 import HospitalListDisplay from '@/components/HospitalListDisplay.vue';
 import HospitalExport from '@/components/HospitalExport.vue';
@@ -93,10 +755,20 @@ export default defineComponent({
       searchQuery: '',
       stateSearchQuery: '',
       providerSearchQuery: '',
+      hospitals: [] as Hospital[],
       timer: 0,
       markdownContent: '',
       showStateDropdown: false,
       showProviderDropdown: false,
+      allStates: [
+        'All state', 'Abia', 'Abuja', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo',
+        'Ekiti', 'Enugu', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+        'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+      ], // Populate with all states
+      allProviders: [
+        'Clinic', 'Dental Clinic','Dermatological Center', 'Ent','Gym','Hospital', 'Optical Center', 'Orthopedic Center', 'Physiotherapy Clinic', 
+        'Psychiatry Center','Psychotherapy Center', 'Spa', 'Tertiary Care Center',
+      ], // Populate with all providers
       editMode: false,
       editedHospital: {} as Hospital,
     };
@@ -152,6 +824,21 @@ export default defineComponent({
         return [];
       }
     },
+    handleEditHospital(hospital: Hospital) {
+      this.editMode = true;
+      this.editedHospital = { ...hospital };
+    },
+    updateHospital() {
+      console.log('Updating hospital:', this.editedHospital);
+      const index = this.hospitals.findIndex(hospital => hospital.id === this.editedHospital.id);
+      if (index !== -1) {
+        this.hospitals[index] = { ...this.editedHospital };
+      } else {
+        console.error('Hospital not found in the hospitals array.');
+      }
+      this.editMode = false;
+      this.editedHospital = {} as Hospital;
+    },
     handleLoginPrompt() {
       alert('Please login or sign up to edit hospitals.'); 
     },
@@ -176,12 +863,26 @@ export default defineComponent({
       this.providerSearchQuery = provider;
       this.showProviderDropdown = false;
     },
+    checkAuthentication() {
+      return checkAuthentication(); // Call the checkAuthentication function to verify the user's authentication status
   }
+  },
+  // props: {
+  //   allStates: {
+  //     type: Array as () => string[],
+  //     required: true,
+  //   },
+  //   allProviders: {
+  //     type: Array as () => string[],
+  //     required: true,
+  //   },
+  // },
 });
 </script>
 
 <style scoped>
-</style>
+</style> -->
+
 
 
 
@@ -273,6 +974,7 @@ export default defineComponent({
     async fetchHospitals() {
       try {
         const response = await axios.get('https://data.humdata.org/dataset/3b4a119a-309c-4d3f-900f-18a1f6ca2dfa/resource/5a3bdd13-3ada-4bf4-ac38-643390bc0562/download/nigeriahealthfacilities.json');
+        console.log(response);
         return response.data;
       } catch (error) {
         console.error('Error fetching hospitals:', error);
@@ -343,15 +1045,24 @@ export default defineComponent({
 
 
 
+
+
+
+
+
+
+
+
+
 <!-- <template>
   <div class="p-4">
     <p class="text-gray-600 ml- mt-20 py-8">Find hospitals close to you</p>
     <div class="flex justify-center mb-10 gap-5"> -->
-      <!-- HospitalForm -->
-      <!-- <HospitalForm /> -->
+<!-- HospitalForm -->
+<!-- <HospitalForm /> -->
 
-      <!-- All states dropdown -->
-      <!-- <div class="relative">
+<!-- All states dropdown -->
+<!-- <div class="relative">
         <input type="text" v-model="stateSearchQuery" placeholder="States..."
           class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="toggleStateDropdown">
 
@@ -373,8 +1084,8 @@ export default defineComponent({
         </div>
       </div> -->
 
-      <!-- All providers dropdown -->
-      <!-- <div class="relative">
+<!-- All providers dropdown -->
+<!-- <div class="relative">
         <input type="text" v-model="providerSearchQuery" placeholder="Providers..."
           class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="toggleProviderDropdown">
         <span class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer" @click="toggleProviderDropdown">
@@ -395,17 +1106,17 @@ export default defineComponent({
         </div>
       </div> -->
 
-      <!-- Search Hospitals input -->
-      <!-- <input type="text" v-model="searchQuery" placeholder="Search Hospitals..."
+<!-- Search Hospitals input -->
+<!-- <input type="text" v-model="searchQuery" placeholder="Search Hospitals..."
         class="p-2 border border-gray-300 rounded-md mb-4 w-md"> -->
 
-      <!-- Search button -->
-      <!-- <button @click="search" class="bg-blue-500 text-white p-4 rounded-md 
+<!-- Search button -->
+<!-- <button @click="search" class="bg-blue-500 text-white p-4 rounded-md 
       hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
     </div> -->
 
-    <!-- Edit form -->
-    <!-- <div v-if="editMode">
+<!-- Edit form -->
+<!-- <div v-if="editMode">
       <h2 class="py-10">Edit Hospital</h2>
       <form @submit.prevent="updateHospital" class="flex justify-center p-10">
         <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
@@ -420,20 +1131,20 @@ export default defineComponent({
       </form>
     </div> -->
 
-    <!-- <div> -->
-    
-    <!-- Markdown Component -->
-    <!-- <markdown-editor v-model="markdownContent" @file-uploaded="handleFileUpload" /> -->
+<!-- <div> -->
 
-    <!-- Pass the hospitals data down to HospitalListDisplay component -->
-    <!-- <HospitalListDisplay :hospitals="filteredHospitals" :allStates="allStates"
+<!-- Markdown Component -->
+<!-- <markdown-editor v-model="markdownContent" @file-uploaded="handleFileUpload" /> -->
+
+<!-- Pass the hospitals data down to HospitalListDisplay component -->
+<!-- <HospitalListDisplay :hospitals="filteredHospitals" :allStates="allStates"
       :allProviders="allProviders" @edit-hospital="handleEditHospital"
       @update-hospital="updateHospital" /> -->
-    
-    <!-- HospitalExport component -->
-    <!-- <HospitalExport /> -->
-  <!-- </div> -->
-  <!-- </div>
+
+<!-- HospitalExport component -->
+<!-- <HospitalExport /> -->
+<!-- </div> -->
+<!-- </div>
 </template> -->
 
 <!-- <script lang="ts">
@@ -596,8 +1307,8 @@ export default defineComponent({
   <div class="p-4">
     <p class="text-gray-600 ml- mt-20 py-8">Find hospitals close to you</p>
     <div class="flex justify-center mb-10 gap-5"> -->
-      <!-- All states dropdown -->
-      <!-- <div class="relative">
+<!-- All states dropdown -->
+<!-- <div class="relative">
         <input type="text" v-model="stateSearchQuery" placeholder="States..."
           class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="showStateDropdown = !showStateDropdown">
 
@@ -619,8 +1330,8 @@ export default defineComponent({
         </div>
       </div> -->
 
-      <!-- All providers dropdown -->
-      <!-- <div class="relative">
+<!-- All providers dropdown -->
+<!-- <div class="relative">
         <input type="text" v-model="providerSearchQuery" placeholder="Providers..."
           class="p-2 border border-gray-300 rounded-md mb-4 w-md" @click="showProviderDropdown = !showProviderDropdown">
         <span class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer" @click="toggleProviderDropdown">
@@ -641,17 +1352,17 @@ export default defineComponent({
         </div>
       </div> -->
 
-      <!-- Search Hospitals input -->
-      <!-- <input type="text" v-model="searchQuery" placeholder="Search Hospitals..."
+<!-- Search Hospitals input -->
+<!-- <input type="text" v-model="searchQuery" placeholder="Search Hospitals..."
         class="p-2 border border-gray-300 rounded-md mb-4 w-md"> -->
 
-      <!-- Search button -->
-      <!-- <button @click="search" class="bg-blue-500 text-white p-4 rounded-md 
+<!-- Search button -->
+<!-- <button @click="search" class="bg-blue-500 text-white p-4 rounded-md 
       hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
     </div> -->
 
-    <!-- Edit form -->
-    <!-- <div v-if="editMode">
+<!-- Edit form -->
+<!-- <div v-if="editMode">
       <h2 class="py-10">Edit Hospital</h2>
       <form @submit.prevent="updateHospital" class="flex justify-center p-10">
         <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
@@ -666,13 +1377,13 @@ export default defineComponent({
       </form>
     </div> -->
 
-    <!-- Pass hospitals data down to HospitalListDisplay component -->
-    <!-- <HospitalListDisplay :hospitals="filteredHospitals" :allStates="allStates"
+<!-- Pass hospitals data down to HospitalListDisplay component -->
+<!-- <HospitalListDisplay :hospitals="filteredHospitals" :allStates="allStates"
       :allProviders="allProviders" @edit-hospital="handleEditHospital"
       @update-hospital="updateHospital" /> -->
 
-    <!-- HospitalExport component -->
-    <!-- <HospitalExport />
+<!-- HospitalExport component -->
+<!-- <HospitalExport />
   </div>
 </template> -->
 
@@ -830,8 +1541,8 @@ export default defineComponent({
       hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
     </div> -->
 
-    <!-- Edit form -->
-    <!-- <div v-if="editMode">
+<!-- Edit form -->
+<!-- <div v-if="editMode">
       <h2 class="py-10">Edit Hospital</h2>
       <form @submit.prevent="updateHospital" class="flex justify-center p-10">
         <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
@@ -843,8 +1554,8 @@ export default defineComponent({
         <button @click="cancelEdit" class="px-3 bg-red-400 text-white hover:bg-red-600 rounded-md">Cancel</button>
       </form>
     </div> -->
-    <!-- Pass hospitals data down to HospitalListDisplay component -->
-    <!-- <HospitalListDisplay :hospitals="filteredHospitals" @edit-hospital="handleEditHospital"
+<!-- Pass hospitals data down to HospitalListDisplay component -->
+<!-- <HospitalListDisplay :hospitals="filteredHospitals" @edit-hospital="handleEditHospital"
       @update-hospital="updateHospital" />
     <HospitalExport />
   </div>
@@ -944,8 +1655,8 @@ export default defineComponent({
       hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
     </div> -->
 
-    <!-- Edit form -->
-    <!-- <div v-if="editMode">
+<!-- Edit form -->
+<!-- <div v-if="editMode">
       <h2 class="py-10">Edit Hospital</h2>
       <form @submit.prevent="updateHospital" class="flex justify-center p-10">
         <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
@@ -956,8 +1667,8 @@ export default defineComponent({
         <button @click="cancelEdit" class="px-3 bg-red-400 text-white hover:bg-red-600 rounded-md">Cancel</button>
       </form>
     </div> -->
-    <!-- Pass hospitals data down to HospitalListDisplay component -->
-    <!-- <HospitalListDisplay :hospitals="filteredHospitals" @edit-hospital="handleEditHospital"
+<!-- Pass hospitals data down to HospitalListDisplay component -->
+<!-- <HospitalListDisplay :hospitals="filteredHospitals" @edit-hospital="handleEditHospital"
       @update-hospital="updateHospital" />
     <HospitalExport />
   </div>
@@ -1074,8 +1785,8 @@ export default defineComponent({
       hover:bg-blue-600 transition-all duration-200 gap-5">Search</button>
     </div> -->
 
-    <!-- Edit form -->
-    <!-- <div v-if="editMode">
+<!-- Edit form -->
+<!-- <div v-if="editMode">
       <h2 class="py-10 mr-4">Edit Hospital</h2>
       <form @submit.prevent="updateHospital" class="flex justify-center p-10">
         <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
@@ -1284,8 +1995,8 @@ export default defineComponent({
   </li>
 </ul> -->
 
-    <!-- Edit Form -->
-    <!-- <div v-if="editMode">
+<!-- Edit Form -->
+<!-- <div v-if="editMode">
       <h2 class="py-7 mr-4">Edit Hospital</h2>
       <form @submit.prevent="updateHospital" class="flex justify-center">
         <input type="text" v-model="editedHospital.name" placeholder="Hospital Name">
@@ -1390,4 +2101,6 @@ export default defineComponent({
     }
   }
 });
-</script> -->
+</script> -->import type HospitalFormVue from './HospitalForm.vue';import type HospitalExportVue from
+'./HospitalExport.vue';
+import type HospitalExportVue from './HospitalExport.vue';
