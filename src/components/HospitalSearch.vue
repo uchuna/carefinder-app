@@ -80,6 +80,11 @@ import hospitals from '@/utils/hospitals';
 import { type Hospital } from '@/utils/hospitals';
 import { checkAuthentication } from '@/utils/authUtils';
 
+
+// Import the type for Timeout
+type Timeout = ReturnType<typeof setTimeout>;
+
+
 export default defineComponent({
   components: {
     HospitalExport,
@@ -92,7 +97,7 @@ export default defineComponent({
       stateSearchQuery: '',
       providerSearchQuery: '',
       hospitals: [] as Hospital[],
-      timer: 0,
+      timer: 0 as number | Timeout,
       markdownContent: '',
       showStateDropdown: false,
       showProviderDropdown: false,
@@ -111,30 +116,30 @@ export default defineComponent({
   },
   computed: {
     filteredHospitals(): Hospital[] {
-  let filteredHospitals = this.hospitals;
+      let filteredHospitals = this.hospitals;
 
-  if (Array.isArray(this.stateSearchQuery) && this.stateSearchQuery.length > 0 && !this.stateSearchQuery.includes('All state')) {
-    const selectedStates: string[] = this.stateSearchQuery.map((state: string) => state.toLowerCase());
-    filteredHospitals = filteredHospitals.filter(hospital =>
-      selectedStates.includes(hospital.state.toLowerCase())
-    );
-  }
+      if (Array.isArray(this.stateSearchQuery) && this.stateSearchQuery.length > 0 && !this.stateSearchQuery.includes('All state')) {
+        const selectedStates: string[] = this.stateSearchQuery.map((state: string) => state.toLowerCase());
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          selectedStates.includes(hospital.state.toLowerCase())
+        );
+      }
 
-  if (this.providerSearchQuery) {
-    filteredHospitals = filteredHospitals.filter(hospital =>
-      hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
-    );
-  }
+      if (this.providerSearchQuery) {
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
+        );
+      }
 
-  if (this.searchQuery) {
-    const query = this.searchQuery.toLowerCase().trim();
-    filteredHospitals = filteredHospitals.filter(hospital =>
-      hospital.name.toLowerCase().includes(query) ||
-      hospital.address.toLowerCase().includes(query) ||
-      hospital.phoneNumber.includes(query) ||
-      (hospital.email && hospital.email.toLowerCase().includes(query))
-    );
-  }
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase().trim();
+        filteredHospitals = filteredHospitals.filter(hospital =>
+          hospital.name.toLowerCase().includes(query) ||
+          hospital.address.toLowerCase().includes(query) ||
+          hospital.phoneNumber.includes(query) ||
+          (hospital.email && hospital.email.toLowerCase().includes(query))
+        );
+      }
 
       return filteredHospitals;
     }
@@ -176,10 +181,6 @@ export default defineComponent({
           console.error('Error fetching hospitals:', error);
         }
       }, 300);
-    },
-    async fetchHospitals() {
-      // Simulated API call
-      return [];
     },
     handleEditHospital(hospital: Hospital) {
       this.editMode = true;
@@ -236,7 +237,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped></style>
+
+
 
 
 
