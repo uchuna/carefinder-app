@@ -111,29 +111,30 @@ export default defineComponent({
   },
   computed: {
     filteredHospitals(): Hospital[] {
-      let filteredHospitals = this.hospitals;
+  let filteredHospitals = this.hospitals;
 
-      if (this.stateSearchQuery) {
-        filteredHospitals = filteredHospitals.filter(hospital =>
-          hospital.state.toLowerCase().includes(this.stateSearchQuery.toLowerCase())
-        );
-      }
+  if (Array.isArray(this.stateSearchQuery) && this.stateSearchQuery.length > 0 && !this.stateSearchQuery.includes('All state')) {
+    const selectedStates: string[] = this.stateSearchQuery.map((state: string) => state.toLowerCase());
+    filteredHospitals = filteredHospitals.filter(hospital =>
+      selectedStates.includes(hospital.state.toLowerCase())
+    );
+  }
 
-      if (this.providerSearchQuery) {
-        filteredHospitals = filteredHospitals.filter(hospital =>
-          hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
-        );
-      }
+  if (this.providerSearchQuery) {
+    filteredHospitals = filteredHospitals.filter(hospital =>
+      hospital.provider.toLowerCase().includes(this.providerSearchQuery.toLowerCase())
+    );
+  }
 
-      if (this.searchQuery) {
-        const query = this.searchQuery.toLowerCase().trim();
-        filteredHospitals = filteredHospitals.filter(hospital =>
-          hospital.name.toLowerCase().includes(query) ||
-          hospital.address.toLowerCase().includes(query) ||
-          hospital.phoneNumber.includes(query) ||
-          (hospital.email && hospital.email.toLowerCase().includes(query))
-        );
-      }
+  if (this.searchQuery) {
+    const query = this.searchQuery.toLowerCase().trim();
+    filteredHospitals = filteredHospitals.filter(hospital =>
+      hospital.name.toLowerCase().includes(query) ||
+      hospital.address.toLowerCase().includes(query) ||
+      hospital.phoneNumber.includes(query) ||
+      (hospital.email && hospital.email.toLowerCase().includes(query))
+    );
+  }
 
       return filteredHospitals;
     }

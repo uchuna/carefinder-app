@@ -1,7 +1,7 @@
 <template>
   <div>
     <h2 class="text-violet-500 bg-gray-300 text-center text-xl font-semibold mb-4 py-3">Hospital List</h2>
-    
+
     <ul>
       <li v-for="hospital in displayedHospitals" :key="hospital.id">
         <!-- Hospital details -->
