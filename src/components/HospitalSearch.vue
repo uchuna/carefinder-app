@@ -2102,6 +2102,4 @@ export default defineComponent({
     }
   }
 });
-</script> -->import type HospitalFormVue from './HospitalForm.vue';import type HospitalExportVue from
-'./HospitalExport.vue';
-import type HospitalExportVue from './HospitalExport.vue';
+</script> -->
